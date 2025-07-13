@@ -3,7 +3,7 @@
 Breve PoC de API Gateway estadual para unificar acesso às APIs do Conecta.gov.br.
 
 ## Requisitos
-- Java 17
+- Java 21
 - Maven ou Gradle
 - Eclipse IDE
 - Git
@@ -13,6 +13,4 @@ Breve PoC de API Gateway estadual para unificar acesso às APIs do Conecta.gov.b
 - `/src/main/java` – Código-fonte do microserviço
 - `/docs` – Planejamento, especificações e lições aprendidas
 
-## Contribuição
-- Use branches `feature/*` e abra Pull Requests para `main`.
 
