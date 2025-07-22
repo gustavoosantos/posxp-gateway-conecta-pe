@@ -1,0 +1,16 @@
+# Este arquivo só é carregado quando o perfil "stub" está ativo.
+# Ele sobrescreve as configurações do application.yml principal.
+# Criado para fins de gerar evidências para a sprint, por conta da indisponibilidade temporária das APIs Conecta.gov.br
+
+broker:
+  apis:
+    "cpf-light-api":
+      # Redireciona a chamada da API de CPF para um endpoint local no nosso StubController
+      target-url: "http://localhost:8080/stubs/conecta/cpf"
+      # Redireciona a chamada de token para um endpoint local no nosso StubController
+      token-url: "http://localhost:8080/stubs/conecta/token"
+
+logging:
+  level:
+    # Aumentamos o nível de log para o nosso stub para ver o que está acontecendo
+    br.gov.pe.brokerconecta.stub: DEBUG
