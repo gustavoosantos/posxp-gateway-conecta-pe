@@ -10,14 +10,17 @@ Este projeto é um Módulo de Integração (Broker) desenvolvido em **Spring Boo
 
 O foco inicial desta Prova de Conceito (PoC) é a integração com a API de consulta de CPF.
 
-## Requisitos
+## Tecnologias utilizadas
 - Java JDK 21 
 - Apache Maven 3.9+
 - Spring Boot 3
-- Acesso às credenciais (Client ID/Secret) do ambiente de sandbox do Conecta.gov.br
 - Eclipse IDE
-- Git
 - Postman (ou similar) para testes OAuth2
+
+## Requisitos
+- Java JDK 21 
+- Apache Maven 3.9+
+- Acesso às credenciais (Client ID/Secret) do ambiente de sandbox do Conecta.gov.br
 
 ## Estrutura
 - `/brokerconecta/src/main/java` – Código-fonte do microserviço
