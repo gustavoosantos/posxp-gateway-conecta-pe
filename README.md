@@ -10,7 +10,7 @@ Breve PoC de API Gateway estadual para unificar acesso às APIs do Conecta.gov.b
 - Postman (ou similar) para testes OAuth2
 
 ## Estrutura
-- `/src/main/java` – Código-fonte do microserviço
+- `/brokerconecta/src/main/java` – Código-fonte do microserviço
 - `/docs` – Planejamento, especificações e lições aprendidas
 
 
