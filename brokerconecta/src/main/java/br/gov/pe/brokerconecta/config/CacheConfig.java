@@ -16,7 +16,7 @@ public class CacheConfig {
         cacheManager.setCaffeine(Caffeine.newBuilder()
                 // Token do Conecta expira em 2h (120 min). Usamos um cache de 110 min.
                 .expireAfterWrite(110, TimeUnit.MINUTES)
-                .maximumSize(100)); // Armazena no máximo 100 tokens diferentes
+                .maximumSize(500)); // Armazena no máximo 500 tokens diferentes
         return cacheManager;
     }
 }
