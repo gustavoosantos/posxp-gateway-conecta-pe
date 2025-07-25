@@ -16,11 +16,9 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import java.util.Base64;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Serviço responsável por gerenciar o ciclo de vida dos tokens de acesso.
- * Utiliza um cache manual para funcionar corretamente com o fluxo reativo (Mono).
- */
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -29,48 +27,58 @@ public class TokenManagerService {
     private final WebClient.Builder webClientBuilder;
     private final CacheManager cacheManager;
 
-    /**
-     * Ponto de entrada principal para obter um token de acesso.
-     * Verifica primeiro o cache e, em caso de falha (miss), busca um novo token.
-     *
-     * @param clientConfig Configuração do cliente que está fazendo a requisição.
-     * @param apiConfig    Configuração da API de destino, que contém a URL do token.
-     * @return Um Mono contendo o token de acesso (String).
-     */
+    // 1. Cache temporário para requisições de token em andamento (in-flight).
+    //    Usa ConcurrentHashMap para ser seguro em ambiente com múltiplas threads.
+    private final Map<String, Mono<String>> inFlightRequests = new ConcurrentHashMap<>();
+
     public Mono<String> getAccessToken(ClientConfig clientConfig, ApiConfig apiConfig) {
         
-        Cache cache = cacheManager.getCache("tokens");
-        if (cache == null) {
-            // Fallback de segurança caso o cache não seja encontrado
-            return fetchAndCacheToken(clientConfig, apiConfig, null);
-        }
-
+        Cache longTermCache = cacheManager.getCache("tokens");
         String cacheKey = clientConfig.getClientId();
-        Cache.ValueWrapper valueWrapper = cache.get(cacheKey);
-
-        // CACHE HIT: O token foi encontrado no cache.
+        
+        // 2. Tenta buscar no cache de longo prazo primeiro (Caffeine).
+        Cache.ValueWrapper valueWrapper = (longTermCache != null) ? longTermCache.get(cacheKey) : null;
         if (valueWrapper != null) {
-            log.info(">>> [CACHE HIT] Token encontrado no cache para o cliente: {}", cacheKey);
+            log.info(">>> [CACHE HIT] Token encontrado no cache de longo prazo para o cliente: {}", cacheKey);
             return Mono.just((String) valueWrapper.get());
         }
 
-        // CACHE MISS: O token não foi encontrado, precisa buscar um novo.
-        return fetchAndCacheToken(clientConfig, apiConfig, cache);
+        // 3. Se não encontrou, usa o cache in-flight para lidar com a concorrência.
+        //    computeIfAbsent é atômico: garante que o bloco de código só será executado UMA VEZ
+        //    pela primeira thread que chegar aqui para uma dada chave.
+        return inFlightRequests.computeIfAbsent(cacheKey, key -> {
+            log.warn(">>> [CONCURRENCY] Cache de longo prazo vazio. Iniciando busca de novo token para o cliente: {}", key);
+            
+            // 4. Apenas a primeira thread executa esta parte.
+            return fetchTokenFromProvider(clientConfig, apiConfig)
+                    .doOnSuccess(token -> {
+                        // 5. Ao obter o token com sucesso, armazena no cache de longo prazo.
+                        if (longTermCache != null && token != null) {
+                            log.info(">>> [CACHE] Armazenando novo token no cache de longo prazo: {}", key);
+                            longTermCache.put(key, token);
+                        }
+                    })
+                    // 6. Remove a requisição do mapa in-flight quando ela termina (com sucesso ou erro).
+                    .doOnTerminate(() -> {
+                        log.debug(">>> [CONCURRENCY] Finalizando requisição in-flight para o cliente: {}", key);
+                        inFlightRequests.remove(key);
+                    })
+                    // 7. O operador .cache() é a chave! Ele garante que a chamada WebClient
+                    //    seja executada apenas uma vez, e seu resultado é "reproduzido" para
+                    //    todas as threads concorrentes que estavam "escutando" este Mono.
+                    .cache(); 
+        });
     }
 
     /**
-     * Método privado que executa a chamada WebClient para o servidor de autenticação
-     * e armazena o resultado no cache em caso de sucesso.
+     * Método que realmente executa a chamada WebClient para o provedor de identidade.
      */
-    private Mono<String> fetchAndCacheToken(ClientConfig clientConfig, ApiConfig apiConfig, Cache cache) {
-        String cacheKey = clientConfig.getClientId();
-        log.info(">>> [CACHE MISS] Solicitando novo token de acesso para o cliente: {}", cacheKey);
-
-        // O corpo da requisição agora contém apenas o grant_type
+    private Mono<String> fetchTokenFromProvider(ClientConfig clientConfig, ApiConfig apiConfig) {
+        log.info(">>> [API CALL] Disparando chamada WebClient para obter token...");
+        
         MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
         formData.add("grant_type", "client_credentials");
 
-        // As credenciais são combinadas, codificadas em Base64 e enviadas no header Authorization
         String auth = clientConfig.getClientId() + ":" + clientConfig.getClientSecret();
         String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes());
         String authHeader = "Basic " + encodedAuth;
@@ -84,13 +92,6 @@ public class TokenManagerService {
             .retrieve()
             .bodyToMono(TokenResponseDTO.class)
             .map(TokenResponseDTO::getAccessToken)
-            .doOnSuccess(token -> {
-                // Em caso de sucesso, o novo token é armazenado no cache
-                if (cache != null && token != null) {
-                    log.info(">>> [CACHE] Armazenando novo token no cache para o cliente: {}", cacheKey);
-                    cache.put(cacheKey, token);
-                }
-            })
             .doOnError(error -> log.error("Erro ao obter token para cliente {}: {}", clientConfig.getClientId(), error.getMessage()));
     }
 }
