@@ -6,7 +6,7 @@ Breve PoC de API Gateway estadual para unificar acesso às APIs do Conecta.gov.b
 
 ## Visão Geral
 
-Este projeto é um Módulo de Integração (Broker [Conecta.PE]) para centralizar e simplificar o acesso às APIs da plataforma [Conecta.gov.br], abstraindo a complexidade de autenticação e gerenciamento de tokens para as aplicações consumidoras dos órgãos estaduais. O módulo atua como um intermediário que encapsula toda a lógica de autenticação, geração de token e roteamento de chamadas. Assim, as secretarias poderão acessar, de forma unificada e simplificada, os serviços federais de CPF, CNPJ e demais APIs do Conecta.gov.br, sem precisar se preocupar com detalhes de implementação e conformidade.
+Este projeto é um Módulo de Integração (Broker Conecta.PE) para centralizar e simplificar o acesso às APIs da plataforma Conecta.gov.br, abstraindo a complexidade de autenticação e gerenciamento de tokens para as aplicações consumidoras dos órgãos estaduais. O módulo atua como um intermediário que encapsula toda a lógica de autenticação, geração de token e roteamento de chamadas. Assim, as secretarias poderão acessar, de forma unificada e simplificada, os serviços federais de CPF, CNPJ e demais APIs do Conecta.gov.br, sem precisar se preocupar com detalhes de implementação e conformidade.
 
 O foco inicial desta Prova de Conceito (PoC) é a integração com a API de consulta de CPF.
 
