@@ -26,22 +26,33 @@ public class GlobalExceptionHandler {
 
     /**
      * Handler para erros retornados pelas APIs externas (ex: 401, 404, 500 da API de destino).
+     * Inclui tratamento especial para o erro 429 (Too Many Requests).
      */
     @ExceptionHandler(WebClientResponseException.class)
-    public ResponseEntity<String> handleWebClientResponseException(WebClientResponseException ex) {
+    public ResponseEntity<?> handleWebClientResponseException(WebClientResponseException ex) {
         log.error("Erro retornado pela API externa. Status: {}, Body: {}", ex.getStatusCode(), ex.getResponseBodyAsString());
+        
+        // NOVO TRATAMENTO: Verifica se o erro é de limite de requisições excedido.
+        if (ex.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
+            log.warn("Limite de requisições para a API externa foi excedido (Rate Limiting).");
+            Map<String, String> errorBody = Map.of(
+                "erro_servico_externo", "Limite de requisições por segundo excedido.",
+                "detalhe", "O serviço de destino está sobrecarregado. Por favor, tente novamente mais tarde."
+            );
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(errorBody);
+        }
+        
+        // Para todos os outros erros, repassa a resposta original da API externa.
         return ResponseEntity
                 .status(ex.getStatusCode())
                 .body(ex.getResponseBodyAsString());
     }
 
     /**
-     * NOVO HANDLER: Captura erros de conexão, como TIMEOUT.
-     * Lançado quando o WebClient não consegue nem mesmo se conectar ao servidor de destino.
+     * Handler para erros de conexão, como TIMEOUT.
      */
     @ExceptionHandler({WebClientRequestException.class, TimeoutException.class})
     public ResponseEntity<Map<String, String>> handleConnectionErrors(Exception ex) {
-        // A WebClientRequestException geralmente encapsula a causa raiz (ex: ConnectTimeoutException)
         Throwable rootCause = ex.getCause() != null ? ex.getCause() : ex;
         String errorMessage = String.format(
             "Não foi possível conectar ao serviço externo: %s. Verifique a conectividade com o host ou o status do serviço de destino.", 
@@ -51,8 +62,19 @@ public class GlobalExceptionHandler {
         log.error("Erro de conexão/timeout ao tentar acessar API externa. Causa: {}", rootCause.getMessage());
         
         return ResponseEntity
-                .status(HttpStatus.GATEWAY_TIMEOUT) // 504 Gateway Timeout é o status HTTP mais apropriado aqui.
+                .status(HttpStatus.GATEWAY_TIMEOUT)
                 .body(Map.of("erro_gateway", errorMessage));
+    }
+
+    /**
+     * Handler para erros de segurança, como cliente não configurado ou sem permissão.
+     */
+    @ExceptionHandler(SecurityException.class)
+    public ResponseEntity<Map<String, String>> handleSecurityException(SecurityException ex) {
+        log.warn("Falha de segurança/autorização: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN) // 403 Forbidden é o status mais apropriado
+                .body(Map.of("erro_autorizacao", ex.getMessage()));
     }
 
     /**

@@ -3,6 +3,7 @@ package br.gov.pe.brokerconecta.service;
 import br.gov.pe.brokerconecta.config.ApiConfig;
 import br.gov.pe.brokerconecta.config.ClientConfig;
 import br.gov.pe.brokerconecta.dto.TokenResponseDTO;
+import br.gov.pe.brokerconecta.config.ApiPermissionConfig; 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.Cache;
@@ -31,10 +32,11 @@ public class TokenManagerService {
     //    Usa ConcurrentHashMap para ser seguro em ambiente com múltiplas threads.
     private final Map<String, Mono<String>> inFlightRequests = new ConcurrentHashMap<>();
 
-    public Mono<String> getAccessToken(ClientConfig clientConfig, ApiConfig apiConfig) {
+    public Mono<String> getAccessToken(ApiPermissionConfig permission, ApiConfig apiConfig) {
         
         Cache longTermCache = cacheManager.getCache("tokens");
-        String cacheKey = clientConfig.getClientId();
+        // A chave do cache agora é o Client ID da permissão, que é único
+        String cacheKey = permission.getClientId();
         
         // 2. Tenta buscar no cache de longo prazo primeiro (Caffeine).
         Cache.ValueWrapper valueWrapper = (longTermCache != null) ? longTermCache.get(cacheKey) : null;
@@ -50,7 +52,7 @@ public class TokenManagerService {
             log.warn(">>> [CONCURRENCY] Cache de longo prazo vazio. Iniciando busca de novo token para o cliente: {}", key);
             
             // 4. Apenas a primeira thread executa esta parte.
-            return fetchTokenFromProvider(clientConfig, apiConfig)
+            return fetchTokenFromProvider(permission, apiConfig)
                     .doOnSuccess(token -> {
                         // 5. Ao obter o token com sucesso, armazena no cache de longo prazo.
                         if (longTermCache != null && token != null) {
@@ -73,16 +75,17 @@ public class TokenManagerService {
     /**
      * Método que realmente executa a chamada WebClient para o provedor de identidade.
      */
-    private Mono<String> fetchTokenFromProvider(ClientConfig clientConfig, ApiConfig apiConfig) {
+    private Mono<String> fetchTokenFromProvider(ApiPermissionConfig permission, ApiConfig apiConfig) {
         log.info(">>> [API CALL] Disparando chamada WebClient para obter token...");
         
         MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
         formData.add("grant_type", "client_credentials");
-
-        String auth = clientConfig.getClientId() + ":" + clientConfig.getClientSecret();
+        
+        // Usa as credenciais da permissão específica
+        String auth = permission.getClientId() + ":" + permission.getClientSecret();
         String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes());
         String authHeader = "Basic " + encodedAuth;
-
+        
         return webClientBuilder.build()
             .post()
             .uri(apiConfig.getTokenUrl())
@@ -92,6 +95,6 @@ public class TokenManagerService {
             .retrieve()
             .bodyToMono(TokenResponseDTO.class)
             .map(TokenResponseDTO::getAccessToken)
-            .doOnError(error -> log.error("Erro ao obter token para cliente {}: {}", clientConfig.getClientId(), error.getMessage()));
+            .doOnError(error -> log.error("Erro ao obter token para cliente {}: {}", permission.getClientId(), error.getMessage()));
     }
 }

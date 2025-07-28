@@ -1,27 +1,50 @@
-# Ativa o profile de Stubs para testes
-spring:
-  profiles:
-    active: stub # Ativa o perfil "stub" por padrão
+#spring:
+#  profiles:
+#    active: stub
 
 server:
   port: 8080
 
 broker:
+  # Esta seção não muda
   routes:
     - id: "consulta-cpf-lote-v1"
-      path: "/api-cpf/consulta"
+      path: "/api/v1/api-cpf/consulta"
       method: "POST"
       api: "cpf-light-api"
+    - id: "consulta-cnpj-empresa-v1"
+      path: "/api/v1/api-cnpj/consulta/{cnpj}"
+      method: "GET"
+      api: "cnpj-empresa-api"
   
+  # Lista de APIs do Conecta.gov.br
   apis:
     "cpf-light-api":
       target-url: "https://h-apigateway.conectagov.np.estaleiro.serpro.gov.br/api-cpf-light/v2/consulta/cpf"
       token-url: "https://h-apigateway.conectagov.np.estaleiro.serpro.gov.br/oauth2/jwt-token"
+    "cnpj-empresa-api":
+      target-url: "https://h-apigateway.conectagov.np.estaleiro.serpro.gov.br/api-cnpj-empresa/v2/empresa/{cnpj}"
+      token-url: "https://h-apigateway.conectagov.np.estaleiro.serpro.gov.br/oauth2/jwt-token"
 
   clients:
-    # "chave segura" (apelido) 
+    # A chave é o identificador seguro para a aplicação cliente (X-Road)
     sad-portal-cidadao:
-      # O valor real do header vai em um campo próprio
-      xRoadId: "SAD/PORTAL_CIDADAO"
-      clientId: "******"
-      clientSecret: "******"
+      xRoadId: "SAD/PortalPEGOV"
+      # O cliente agora tem um mapa de APIs autorizadas
+      authorizedApis:
+        cpf-light-api:
+          clientId: "**"
+          clientSecret: "**"
+        cnpj-empresa-api:
+          clientId: "****"
+          clientSecret: "****"
+
+    see-sgppe:
+      xRoadId: "SEE/SGPPE"
+      authorizedApis:
+        cpf-light-api:
+          clientId: "******"
+          clientSecret: "******"
+        cnpj-empresa-api:
+          clientId: "**"
+          clientSecret: "**"
